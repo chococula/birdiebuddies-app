@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BirdieBuddies Privacy Policy</title>
+  <style>
+    :root { --text: #262626; --muted: #737373; --line: #dbdbdb; --accent: #0095f6; --bg: #ffffff; }
+    body { margin: 0; background: var(--bg); color: var(--text);
+      font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    main { max-width: 680px; margin: 0 auto; padding: 32px 16px 64px; }
+    h1 { font-size: 26px; margin: 0 0 4px; }
+    h2 { font-size: 17px; margin: 28px 0 6px; }
+    p, li { margin: 6px 0; }
+    .muted { color: var(--muted); font-size: 13px; }
+    a { color: var(--accent); }
+    hr { border: 0; border-top: 1px solid var(--line); margin: 24px 0; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>BirdieBuddies Privacy Policy</h1>
+  <p class="muted">Effective October 4, 2026</p>
+
+  <p>BirdieBuddies is a golf scorecard with a course map. It has no accounts, no ads and no analytics.
+     This page explains what information the app uses and where it goes.</p>
+
+  <h2>Location</h2>
+  <p>With your permission, the app reads your device location to show where you are on the course map
+     and to measure distances to the green. Your live position stays on your device and is never stored
+     on our servers or shared with other players.</p>
+  <p>When you start a round without choosing a course, the app looks up the golf course around you by
+     sending your approximate position to the public OpenStreetMap Overpass service. When a course is
+     selected, the course's own location is sent instead.</p>
+
+  <h2>Scores and player names</h2>
+  <p>Player names, handicaps, scores and the chosen course are saved on your device.</p>
+  <p>Each new round gets a short game code so friends can join and edit scores together. While a round is
+     shared, its course, player names, handicaps and scores are stored in Google Firebase Realtime Database.
+     Anyone who has the game code can view and change that round. Do not enter information you would not
+     want the people you play with to see.</p>
+
+  <h2>Third-party services</h2>
+  <ul>
+    <li><strong>Google Firebase Realtime Database</strong> stores shared rounds
+      (<a href="https://firebase.google.com/support/privacy">Firebase privacy</a>).</li>
+    <li><strong>OpenGolfAPI</strong> receives course names you search for, and your position when you search for nearby courses.</li>
+    <li><strong>Esri</strong> and <strong>OpenStreetMap</strong> provide map tiles; like any website, they receive the map area being viewed.</li>
+    <li><strong>OpenStreetMap Overpass</strong> provides hole layouts for the course location described above.</li>
+  </ul>
+
+  <h2>Children</h2>
+  <p>BirdieBuddies is not directed to children under 13 and does not knowingly collect their information.</p>
+
+  <h2>Deleting your data</h2>
+  <p>Deleting the app removes everything stored on your device, and History can be cleared inside the app.
+     To delete a shared round from our database, send us its game code at the contact below.</p>
+
+  <h2>Changes</h2>
+  <p>If this policy changes, the new version will be posted on this page with a new effective date.</p>
+
+  <hr>
+  <p>Contact: <a href="https://github.com/chococula/birdiebuddies-app/issues">open an issue on GitHub</a> (chococula)</p>
+</main>
+</body>
+</html>
