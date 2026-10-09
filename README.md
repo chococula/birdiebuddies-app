@@ -1,4 +1,4 @@
-# BirdieBuddies
+# BirdieBro
 
 Golf scorecard with satellite course map and GPS distances (Flutter web build).
 
