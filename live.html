@@ -72,7 +72,7 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>LEADERS</h1>
+    <h1 id="lead">LEADERS</h1>
     <div class="sub" id="sub">Loading…</div>
     <div class="live"><span class="dot off" id="dot"></span><span id="liveText">CONNECTING</span></div>
   </header>
@@ -110,7 +110,9 @@
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const code = (new URLSearchParams(location.search).get('game') || '').trim().toUpperCase();
+  const params = new URLSearchParams(location.search);
+  const code = (params.get('game') || '').trim().toUpperCase();
+  const eventCode = (params.get('event') || '').trim().toUpperCase();
   const at = (node, k) => node == null ? undefined : node[k];
   let lastOrder = [];
 
@@ -123,60 +125,59 @@
     const color = d < 0 ? 'under' : '';
     return `<span class="mark ${shape} ${color}">${score}</span>${pts > 0 ? `<span class="pts">+${pts}</span>` : ''}`;
   }
+  function holeFn(courseHoles) {
+    const holesJson = JSON.parse(courseHoles || '{}');
+    return h => holesJson[h] || { par: 4, handicapIndex: h };
+  }
 
-  function render(v) {
-    if (!v || !v.meta) {
-      $('sub').textContent = code ? `No round found for code ${code}` : 'Add ?game=CODE to the address';
-      $('board').innerHTML = `<tr><td class="msg" colspan="6">${code ? 'This round has not started or has ended.' : 'Open this page from “Live leaderboard” in BirdieBro.'}</td></tr>`;
-      $('card').innerHTML = '';
-      return;
-    }
+  // One row per player of a shared round (rooms/CODE), optionally tagged with a group letter.
+  function roomRows(v, group, hole) {
     const m = v.meta;
     const players = JSON.parse(m.players || '[]');
     const hcps = JSON.parse(m.handicaps || '[]');
-    const holesJson = JSON.parse(m.courseHoles || '{}');
-    const stroke = m.gameType !== 'sticks';
-    const hole = h => holesJson[h] || { par: 4, handicapIndex: h };
-    const score = (h, p) => Number(at(at(at(v.holes, h), 's'), p)) || 0;
-    const pts = (h, p) => Number(at(at(at(v.holes, h), 'pts'), p)) || 0;
-
+    const score = p => h => Number(at(at(at(v.holes, h), 's'), p)) || 0;
+    const pts = p => h => Number(at(at(at(v.holes, h), 'pts'), p)) || 0;
     // Strokes received by handicap index; net counts only holes played.
     const recv = (p, h) => { const c = hcps[p] || 0; return c <= 0 ? 0 : Math.floor(c / 18) + (hole(h).handicapIndex <= c % 18 ? 1 : 0); };
-    const rows = players.map((name, p) => {
+    return players.map((name, p) => {
       let strokes = 0, par = 0, thru = 0, net = 0, points = 0, last = 0;
       for (let h = 1; h <= 18; h++) {
-        const s = score(h, p);
-        points += pts(h, p);
+        const s = score(p)(h);
+        points += pts(p)(h);
         if (s > 0) { strokes += s; par += hole(h).par; net += s - recv(p, h); thru++; last = h; }
       }
-      return { name, p, strokes, toPar: strokes - par, netToPar: net - par, thru, net, points, last };
+      return { name, group, hcp: hcps[p] || 0, score: score(p), pts: pts(p), strokes, toPar: strokes - par, netToPar: net - par, thru, points, last };
     });
+  }
+
+  function renderBoard({ subtitle, stroke, hole, rows, showGroup }) {
     // Ranked on net to par (not total strokes) so players who have played more holes
     // aren't pushed down; gross to par breaks ties.
     rows.sort(stroke ? (a, b) => (a.thru === 0) - (b.thru === 0) || a.netToPar - b.netToPar || a.toPar - b.toPar
                      : (a, b) => b.points - a.points);
     const key = r => stroke ? r.netToPar : -r.points;
-    const anyHcp = hcps.some(x => x > 0);
+    const netBoard = stroke && rows.some(r => r.hcp > 0);
     const current = Math.max(0, ...rows.map(r => r.last));
+    const id = r => (r.group || '') + '|' + r.name;
 
-    $('sub').textContent = `${m.courseName || m.title || 'Golf round'} · ${stroke ? 'Stroke play' : 'Volvik game'} · Game ${code}`;
+    $('sub').textContent = subtitle;
     // With handicaps the board is ranked on net, so the big number is net to par.
-    const netBoard = stroke && anyHcp;
-    $('boardHead').innerHTML = `<th>POS</th><th class="name">PLAYER</th><th>${!stroke ? 'PTS' : netBoard ? 'NET' : 'TO PAR'}</th>` +
+    $('boardHead').innerHTML = '<th>POS</th>' + (showGroup ? '<th>GRP</th>' : '') + `<th class="name">PLAYER</th><th>${!stroke ? 'PTS' : netBoard ? 'NET' : 'TO PAR'}</th>` +
       (netBoard ? '<th class="hide-sm">GROSS</th>' : '') + '<th>THRU</th><th class="hide-sm">TOTAL</th>';
-    $('board').innerHTML = rows.map((r, i) => {
+    $('board').innerHTML = rows.length ? rows.map((r, i) => {
       const first = rows.findIndex(x => key(x) === key(r));
       const tied = rows.filter(x => key(x) === key(r)).length > 1;
-      const moved = lastOrder.length && lastOrder.indexOf(r.name) !== i ? 'moved' : '';
+      const moved = lastOrder.length && lastOrder.indexOf(id(r)) !== i ? 'moved' : '';
       const shown = netBoard ? r.netToPar : r.toPar;
       const main = stroke ? `<td class="topar ${cls(shown)}">${r.thru ? toPar(shown) : '–'}</td>` +
                             (netBoard ? `<td class="small hide-sm ${cls(r.toPar)}">${r.thru ? toPar(r.toPar) : '–'}</td>` : '')
                           : `<td class="topar">${r.points}</td>`;
-      return `<tr class="${moved}"><td class="pos">${tied ? 'T' : ''}${first + 1}</td><td class="name">${esc(r.name)}</td>${main}` +
+      return `<tr class="${moved}"><td class="pos">${r.thru || !stroke ? (tied ? 'T' : '') + (first + 1) : '–'}</td>` +
+        (showGroup ? `<td class="small">${esc(r.group)}</td>` : '') + `<td class="name">${esc(r.name)}</td>${main}` +
         `<td class="small">${r.thru === 18 ? 'F' : r.thru || '–'}</td>` +
         `<td class="small hide-sm">${r.thru ? r.strokes : '–'}</td></tr>`;
-    }).join('');
-    lastOrder = rows.map(r => r.name);
+    }).join('') : '<tr><td class="msg" colspan="7">No groups have started yet.</td></tr>';
+    lastOrder = rows.map(id);
 
     const front = [1,2,3,4,5,6,7,8,9], back = [10,11,12,13,14,15,16,17,18];
     const sum = (hs, f) => hs.reduce((a, h) => a + f(h), 0);
@@ -189,25 +190,68 @@
     const hcpRow = '<tr class="hcp"><td class="label">HCP</td>' + front.map(h => `<td>${hole(h).handicapIndex}</td>`).join('') +
       '<td class="sum"></td>' + back.map(h => `<td>${hole(h).handicapIndex}</td>`).join('') + '<td class="sum"></td><td class="sum"></td></tr>';
     const playerRows = rows.map(r => {
-      const cell = h => `<td class="${cc(h).trim()}">${mark(score(h, r.p), hole(h).par, stroke ? 0 : pts(h, r.p))}</td>`;
-      const tot = hs => { const t = sum(hs, h => score(h, r.p)); return t || ''; };
-      return `<tr><td class="label">${esc(r.name).toUpperCase()}</td>${front.map(cell).join('')}<td class="sum">${tot(front)}</td>` +
+      const cell = h => `<td class="${cc(h).trim()}">${mark(r.score(h), hole(h).par, stroke ? 0 : r.pts(h))}</td>`;
+      const tot = hs => { const t = sum(hs, h => r.score(h)); return t || ''; };
+      const label = (r.group ? r.group + ' · ' : '') + r.name;
+      return `<tr><td class="label">${esc(label).toUpperCase()}</td>${front.map(cell).join('')}<td class="sum">${tot(front)}</td>` +
         `${back.map(cell).join('')}<td class="sum">${tot(back)}</td><td class="sum">${tot([...front, ...back])}</td></tr>`;
     }).join('');
     $('card').innerHTML = head + parRow + hcpRow + playerRows;
     $('updated').textContent = 'Last update ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
   }
 
-  if (!code) {
-    render(null);
-  } else {
-    const db = firebase.database();
-    db.ref('.info/connected').on('value', s => {
-      const on = s.val() === true;
-      $('dot').classList.toggle('off', !on);
-      $('liveText').textContent = on ? 'LIVE' : 'RECONNECTING';
+  function showMessage(sub, msg) {
+    $('sub').textContent = sub;
+    $('board').innerHTML = `<tr><td class="msg" colspan="7">${msg}</td></tr>`;
+    $('card').innerHTML = '';
+  }
+
+  function renderGame(v) {
+    if (!v || !v.meta) return showMessage(code ? `No round found for code ${code}` : 'Add ?game=CODE to the address',
+      code ? 'This round has not started or has ended.' : 'Open this page from “Live leaderboard” in BirdieBro.');
+    const m = v.meta, hole = holeFn(m.courseHoles), stroke = m.gameType !== 'sticks';
+    renderBoard({ subtitle: `${m.courseName || m.title || 'Golf round'} · ${stroke ? 'Stroke play' : 'Volvik game'} · Game ${code}`,
+      stroke, hole, rows: roomRows(v, null, hole), showGroup: false });
+  }
+
+  const db = firebase.database();
+  db.ref('.info/connected').on('value', s => {
+    const on = s.val() === true;
+    $('dot').classList.toggle('off', !on);
+    $('liveText').textContent = on ? 'LIVE' : 'RECONNECTING';
+  });
+
+  if (eventCode) {
+    // Tournament: every group (rooms listed under events/CODE/groups) on one board.
+    let meta = null, order = [];
+    const rooms = {}, refs = {};
+    const redraw = () => {
+      if (!meta) return showMessage(`No tournament found for code ${eventCode}`, 'Check the code with the organizer.');
+      const hole = holeFn(meta.courseHoles);
+      const rows = [];
+      order.forEach((room, i) => {
+        const v = rooms[room];
+        if (v && v.meta) rows.push(...roomRows(v, String.fromCharCode(65 + i), hole));
+      });
+      renderBoard({ subtitle: `${meta.courseName || ''} · ${order.length} group${order.length === 1 ? '' : 's'} · ${eventCode}`,
+        stroke: true, hole, rows, showGroup: true });
+      $('lead').textContent = meta.name.toUpperCase();
+    };
+    db.ref('events/' + eventCode + '/meta').on('value', s => { meta = s.val(); redraw(); });
+    db.ref('events/' + eventCode + '/groups').on('value', s => {
+      const g = s.val() || {};
+      order = Object.keys(g).sort((a, b) => ((g[a] && g[a].t) || 0) - ((g[b] && g[b].t) || 0));
+      Object.keys(refs).filter(r => !order.includes(r)).forEach(r => { refs[r].off(); delete refs[r]; delete rooms[r]; });
+      order.filter(r => !refs[r]).forEach(r => {
+        refs[r] = db.ref('rooms/' + r);
+        refs[r].on('value', rs => { rooms[r] = rs.val(); redraw(); });
+      });
+      redraw();
     });
-    db.ref('rooms/' + code).on('value', s => render(s.val()), () => render(null));
+  } else if (code) {
+    db.ref('rooms/' + code).on('value', s => renderGame(s.val()), () => renderGame(null));
+  } else {
+    renderGame(null);
   }
 </script>
 </body>
