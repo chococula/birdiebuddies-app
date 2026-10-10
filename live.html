@@ -59,6 +59,9 @@
       font: 12px -apple-system, system-ui, sans-serif; align-items: center; }
     .legend span { display: inline-flex; align-items: center; gap: 6px; }
     .msg { padding: 40px 16px; text-align: center; color: var(--muted); font-family: -apple-system, system-ui, sans-serif; }
+    .verse { margin-top: 26px; text-align: center; font-style: italic; font-size: 17px; color: var(--ink); }
+    .verse span { display: block; margin-top: 4px; font: 600 12px -apple-system, system-ui, sans-serif; font-style: normal; color: var(--muted); letter-spacing: .5px; }
+    .powered { letter-spacing: 2px; font-weight: 700; }
     footer { margin-top: 18px; color: var(--muted); font: 12px -apple-system, system-ui, sans-serif; text-align: center; }
     footer a { color: var(--green); }
     @media (max-width: 600px) {
@@ -92,8 +95,9 @@
     <span><span class="mark m-bo">5</span>Bogey</span>
     <span><span class="mark m-d">6</span>Double bogey +</span>
   </div>
+  <div class="verse">“So the last will be first, and the first last.”<span>Matthew 20:16</span></div>
   <footer>Updates live as players enter scores · <span id="updated"></span><br>
-    <a href="https://chococula.github.io/birdiebuddies-app/">BirdieBro</a></footer>
+    <a href="https://chococula.github.io/birdiebuddies-app/">BirdieBro</a> · <span class="powered">POWERED BY TVPC</span></footer>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -210,7 +214,7 @@
     if (!v || !v.meta) return showMessage(code ? `No round found for code ${code}` : 'Add ?game=CODE to the address',
       code ? 'This round has not started or has ended.' : 'Open this page from “Live leaderboard” in BirdieBro.');
     const m = v.meta, hole = holeFn(m.courseHoles), stroke = m.gameType !== 'sticks';
-    renderBoard({ subtitle: `${m.courseName || m.title || 'Golf round'} · ${stroke ? 'Stroke play' : 'Volvik game'} · Game ${code}`,
+    renderBoard({ subtitle: `${m.courseName || m.title || 'Golf round'} · ${stroke ? 'Stroke play' : 'Sticks game'} · Game ${code}`,
       stroke, hole, rows: roomRows(v, null, hole), showGroup: false });
   }
 
