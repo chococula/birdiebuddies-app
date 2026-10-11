@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BirdieBuddies Privacy Policy</title>
+  <title>BirdieBro Privacy Policy</title>
   <style>
     :root { --text: #262626; --muted: #737373; --line: #dbdbdb; --accent: #0095f6; --bg: #ffffff; }
     body { margin: 0; background: var(--bg); color: var(--text);
@@ -19,10 +19,10 @@
 </head>
 <body>
 <main>
-  <h1>BirdieBuddies Privacy Policy</h1>
-  <p class="muted">Effective October 4, 2026</p>
+  <h1>BirdieBro Privacy Policy</h1>
+  <p class="muted">Effective October 10, 2026</p>
 
-  <p>BirdieBuddies is a golf scorecard with a course map. It has no accounts, no ads and no analytics.
+  <p>BirdieBro is a golf scorecard with a course map. It has no accounts, no ads and no analytics.
      This page explains what information the app uses and where it goes.</p>
 
   <h2>Location</h2>
@@ -33,28 +33,49 @@
      sending your approximate position to the public OpenStreetMap Overpass service. When a course is
      selected, the course's own location is sent instead.</p>
 
+  <h2>Compass</h2>
+  <p>The map can show which way your phone is pointing. The compass reading is used on your device only
+     and is never sent anywhere.</p>
+
+  <h2>Anonymous ID</h2>
+  <p>The app signs in to Google Firebase anonymously, which gives this install a random ID. It is used only
+     to know which phone organizes a tournament. No name, email or phone number is attached to it, and
+     deleting the app removes it.</p>
+
   <h2>Scores and player names</h2>
   <p>Player names, handicaps, scores and the chosen course are saved on your device.</p>
   <p>Each new round gets a short game code so friends can join and edit scores together. While a round is
      shared, its course, player names, handicaps and scores are stored in Google Firebase Realtime Database.
      Anyone who has the game code can view and change that round. Do not enter information you would not
      want the people you play with to see.</p>
+  <p><strong>Live leaderboard.</strong> If you share a round's live leaderboard link, anyone with that link can
+     view (but not change) the player names and scores of that round.</p>
+  <p><strong>Tournaments.</strong> A tournament stores its name, course and the game codes of the groups that
+     joined, plus the organizer's anonymous ID. Anyone with the tournament code can view the combined
+     leaderboard; only the organizer can rename it or remove groups.</p>
+  <p><strong>Green positions.</strong> Green pins you place on the map are shared, without any player
+     information, so other golfers at the same course see them.</p>
 
   <h2>Third-party services</h2>
   <ul>
-    <li><strong>Google Firebase Realtime Database</strong> stores shared rounds
+    <li><strong>Google Firebase Realtime Database</strong> stores shared rounds, tournaments and green pins;
+      <strong>Firebase Authentication</strong> issues the anonymous ID
       (<a href="https://firebase.google.com/support/privacy">Firebase privacy</a>).</li>
     <li><strong>OpenGolfAPI</strong> receives course names you search for, and your position when you search for nearby courses.</li>
-    <li><strong>Esri</strong> and <strong>OpenStreetMap</strong> provide map tiles; like any website, they receive the map area being viewed.</li>
+    <li><strong>Esri</strong> and <strong>OpenStreetMap</strong> provide map tiles; like any website, they receive the map area being viewed.
+      Map tiles for a course are saved on your device so the map works without signal.</li>
     <li><strong>OpenStreetMap Overpass</strong> provides hole layouts for the course location described above.</li>
   </ul>
 
   <h2>Children</h2>
-  <p>BirdieBuddies is not directed to children under 13 and does not knowingly collect their information.</p>
+  <p>BirdieBro is not directed to children under 13 and does not knowingly collect their information.</p>
 
   <h2>Deleting your data</h2>
   <p>Deleting the app removes everything stored on your device, and History can be cleared inside the app.
      To delete a shared round from our database, send us its game code at the contact below.</p>
+
+  <h2>Terms</h2>
+  <p>Use of the app is also covered by the <a href="terms.html">Terms of Use</a>.</p>
 
   <h2>Changes</h2>
   <p>If this policy changes, the new version will be posted on this page with a new effective date.</p>
