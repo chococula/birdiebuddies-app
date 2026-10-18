@@ -177,8 +177,8 @@
   function showPins(pins) {
     pinLayer.clearLayers();
     const list = [];
-    const entries = Array.isArray(pins) ? pins.map((v, i) => [i, v]) : Object.entries(pins || {});
-    for (const [h, v] of entries) {
+    // Firebase hands back holes 1..n as a sparse array; Object.entries skips the gaps.
+    for (const [h, v] of Object.entries(pins || {})) {
       if (!v || typeof v.lat !== 'number') continue;
       list.push(`#${h}`);
       L.circleMarker([v.lat, v.lng], { radius: 6, color: '#f59e0b', weight: 3, fillOpacity: 0.2 })
