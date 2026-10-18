@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BirdieBro Course Editor</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  :root { --text:#262626; --muted:#737373; --line:#dbdbdb; --accent:#0095f6; --bg:#fff; --card:#fafafa; --ok:#16a34a; --bad:#ed4956; --gold:#f59e0b; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color:var(--text); background:var(--bg); }
+  header { display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; }
+  header .grow { flex:1; }
+  button { font:inherit; padding:7px 12px; border-radius:10px; border:1px solid var(--line); background:var(--card); cursor:pointer; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:700; }
+  button.danger { color:var(--bad); }
+  button:disabled { opacity:.5; cursor:default; }
+  input { font:inherit; padding:7px 10px; border:1px solid var(--line); border-radius:10px; }
+  main { display:grid; grid-template-columns: 360px 1fr; height: calc(100vh - 56px); }
+  aside { overflow:auto; padding:12px 16px; border-right:1px solid var(--line); }
+  #map { height:100%; }
+  h2 { font-size:12px; text-transform:uppercase; color:var(--muted); letter-spacing:.5px; margin:16px 0 6px; }
+  .results div { padding:6px 8px; border-radius:8px; cursor:pointer; }
+  .results div:hover { background:var(--card); }
+  .holes { display:grid; grid-template-columns: repeat(6, 1fr); gap:6px; }
+  .holes button { padding:6px 0; }
+  .holes button.done { border-color:var(--ok); color:var(--ok); font-weight:700; }
+  .holes button.sel { background:var(--accent); color:#fff; border-color:var(--accent); }
+  table { border-collapse:collapse; width:100%; }
+  td, th { padding:2px; text-align:center; font-size:12px; }
+  td input { width:100%; padding:4px 2px; text-align:center; border-radius:6px; }
+  .muted { color:var(--muted); font-size:12px; }
+  .status { padding:8px 10px; border-radius:10px; background:var(--card); margin-top:8px; font-size:12px; }
+  .row { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+  .hole-label { background:#000a; color:#fff; border-radius:10px; padding:1px 6px; font-weight:800; font-size:12px; white-space:nowrap; }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; grid-template-rows: auto 60vh; height:auto; } aside { border-right:0; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>⛳ BirdieBro Course Editor</h1>
+  <span class="grow"></span>
+  <span id="who" class="muted">Not signed in</span>
+  <button id="signin">Sign in with Google</button>
+  <button id="signout" hidden>Sign out</button>
+</header>
+<main>
+  <aside>
+    <h2>1. Course</h2>
+    <div class="row"><input id="q" placeholder="Course name (e.g. Shadow Lakes)" style="flex:1"><button id="search">Search</button></div>
+    <div id="results" class="results"></div>
+    <div id="course" class="status" hidden></div>
+
+    <h2>2. Hole</h2>
+    <div id="holes" class="holes"></div>
+    <div id="holeInfo" class="status">Pick a course, then a hole. Click the map from the <b>tee</b> to the <b>green</b> (add a point at a dogleg). Drag points to move them.</div>
+    <div class="row">
+      <button id="undo">Undo point</button>
+      <button id="clear" class="danger">Clear hole</button>
+      <button id="fit">Show whole course</button>
+    </div>
+
+    <h2>3. Scorecard</h2>
+    <table id="card"></table>
+
+    <h2>4. Save</h2>
+    <div class="row"><button id="save" class="primary" disabled>Save to BirdieBro</button></div>
+    <div id="saveStatus" class="muted" style="margin-top:6px">Only BirdieBro admins can save.</div>
+
+    <h2>Players' green pins</h2>
+    <div id="pins" class="muted">—</div>
+  </aside>
+  <div id="map"></div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script>
+  // Same Firebase project and data layout as the app (lib/services/shared_greens.dart):
+  //   courses/KEY/holes/H = {line: [[lat,lng], ...tee -> green], par}
+  //   courses/KEY/card    = {par: [18], hcp: [18]}
+  // Writes to holes and card are allowed only for uids listed under admins/.
+  firebase.initializeApp({
+    apiKey: 'AIzaSyAsUysaXZT8ULihIgqqZ7jQz1MePxq94u4',
+    authDomain: 'birdiebuddies-chococula.firebaseapp.com',
+    databaseURL: 'https://birdiebuddies-chococula-default-rtdb.firebaseio.com',
+    projectId: 'birdiebuddies-chococula',
+  });
+  const db = firebase.database();
+  const auth = firebase.auth();
+  const API = 'https://api.opengolfapi.org/api/v1';
+  const $ = (id) => document.getElementById(id);
+  const courseKey = (id) => id.replace(/[.#$\[\]\/]/g, '_');
+  const yards = (a, b) => L.latLng(a).distanceTo(L.latLng(b)) * 1.0936133;
+
+  // ---- map
+  const map = L.map('map', { maxZoom: 20 }).setView([37.7749, -122.4194], 12);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    { maxZoom: 20, maxNativeZoom: 19, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' }).addTo(map);
+  const layer = L.layerGroup().addTo(map);
+  const pinLayer = L.layerGroup().addTo(map);
+
+  // ---- state
+  let course = null;          // {id, name, lat, lng}
+  let lines = {};             // hole -> [[lat,lng], ...]
+  let par = Array(18).fill(4), hcp = Array.from({ length: 18 }, (_, i) => i + 1), apiYards = Array(18).fill(null);
+  let hole = 1, dirty = false;
+
+  function setDirty(v = true) { dirty = v; $('save').disabled = !course || !auth.currentUser; }
+
+  // ---- auth
+  $('signin').onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch((e) => alert(e.message));
+  $('signout').onclick = () => auth.signOut();
+  auth.onAuthStateChanged(async (u) => {
+    $('signin').hidden = !!u; $('signout').hidden = !u;
+    $('who').textContent = u ? `${u.email || 'signed in'} · uid ${u.uid}` : 'Not signed in';
+    setDirty(dirty);
+    if (u) {
+      const admin = (await db.ref(`admins/${u.uid}`).get().catch(() => null))?.val() === true;
+      $('saveStatus').textContent = admin ? 'You are an admin: saving is enabled.'
+        : `Not an admin yet. Ask to add this uid: ${u.uid}`;
+    }
+  });
+
+  // ---- course search
+  $('search').onclick = search;
+  $('q').onkeydown = (e) => { if (e.key === 'Enter') search(); };
+  async function search() {
+    $('results').textContent = 'Searching…';
+    const r = await fetch(`${API}/courses/search?q=${encodeURIComponent($('q').value)}`).then((x) => x.json()).catch(() => null);
+    const items = Array.isArray(r) ? r : (r?.courses || r?.data || r?.results || []);
+    $('results').innerHTML = '';
+    if (!items.length) { $('results').textContent = 'No courses found.'; return; }
+    for (const c of items.slice(0, 15)) {
+      const d = document.createElement('div');
+      d.textContent = `${c.course_name || c.name || c.club_name || 'Course'} — ${c.city || ''} ${c.state || ''} (${c.holes || '?'} holes)`;
+      d.onclick = () => openCourse(c.id);
+      $('results').appendChild(d);
+    }
+  }
+
+  async function openCourse(id) {
+    if (dirty && !confirm('Discard unsaved changes?')) return;
+    const [detail, holesApi] = await Promise.all([
+      fetch(`${API}/courses/${id}`).then((x) => x.json()),
+      fetch(`${API}/courses/${id}/holes`).then((x) => x.json()).catch(() => ({})),
+    ]);
+    const c = detail.course || detail;
+    course = { id, name: c.course_name || c.club_name || c.name, lat: c.lat, lng: c.lng };
+    const hl = Array.isArray(holesApi) ? holesApi : (holesApi.holes || []);
+    par = Array(18).fill(4); hcp = Array.from({ length: 18 }, (_, i) => i + 1); apiYards = Array(18).fill(null);
+    for (const h of hl) {
+      const n = (h.hole_number || h.number) - 1;
+      if (n >= 0 && n < 18) { par[n] = h.par || 4; hcp[n] = h.handicap || h.handicap_index || n + 1; apiYards[n] = h.yards || h.distance || null; }
+    }
+    const key = courseKey(id);
+    const [holesSnap, cardSnap, pinsSnap] = await Promise.all(
+      ['holes', 'card', 'greens'].map((p) => db.ref(`courses/${key}/${p}`).get()));
+    lines = {};
+    const saved = holesSnap.val() || {};
+    for (const [k, v] of Object.entries(saved)) if (v && Array.isArray(v.line)) lines[+k] = v.line;
+    const card = cardSnap.val();
+    if (card?.par?.length === 18) par = card.par.slice();
+    if (card?.hcp?.length === 18) hcp = card.hcp.slice();
+    showPins(pinsSnap.val());
+    $('course').hidden = false;
+    $('course').innerHTML = `<b>${course.name}</b><br><span class="muted">id ${id}</span><br>
+      ${Object.keys(lines).length} holes drawn · card ${card ? 'corrected' : 'from OpenGolfAPI'}`;
+    $('results').innerHTML = '';
+    if (course.lat) map.setView([course.lat, course.lng], 16);
+    renderCard(); pickHole(1, false); setDirty(false); fitCourse();
+  }
+
+  function showPins(pins) {
+    pinLayer.clearLayers();
+    const list = [];
+    const entries = Array.isArray(pins) ? pins.map((v, i) => [i, v]) : Object.entries(pins || {});
+    for (const [h, v] of entries) {
+      if (!v || typeof v.lat !== 'number') continue;
+      list.push(`#${h}`);
+      L.circleMarker([v.lat, v.lng], { radius: 6, color: '#f59e0b', weight: 3, fillOpacity: 0.2 })
+        .bindTooltip(`Player pin · hole ${h}`).addTo(pinLayer);
+    }
+    $('pins').textContent = list.length ? `Shown in orange on the map: ${list.join(', ')}` : 'None yet.';
+  }
+
+  // ---- holes
+  for (let h = 1; h <= 18; h++) {
+    const b = document.createElement('button'); b.textContent = h; b.onclick = () => pickHole(h); b.id = `h${h}`;
+    $('holes').appendChild(b);
+  }
+  function pickHole(h, zoom = true) {
+    hole = h; draw();
+    const l = lines[h];
+    if (zoom && l?.length) map.fitBounds(L.latLngBounds(l).pad(0.3));
+  }
+  function draw() {
+    layer.clearLayers();
+    for (let h = 1; h <= 18; h++) {
+      const b = $(`h${h}`); b.className = (h === hole ? 'sel ' : '') + (lines[h]?.length >= 2 ? 'done' : '');
+      const l = lines[h]; if (!l?.length) continue;
+      const cur = h === hole;
+      L.polyline(l, { color: cur ? '#f59e0b' : '#ffffff', weight: cur ? 4 : 2, opacity: cur ? 1 : 0.7, dashArray: cur ? null : '4 6' }).addTo(layer);
+      L.marker(l[0], { icon: L.divIcon({ className: '', html: `<span class="hole-label">${h}</span>`, iconAnchor: [8, 22] }), interactive: false }).addTo(layer);
+      if (!cur) continue;
+      l.forEach((p, i) => {
+        const last = i === l.length - 1, first = i === 0;
+        const m = L.marker(p, {
+          draggable: true,
+          icon: L.divIcon({ className: '', iconSize: [18, 18], iconAnchor: [9, 9],
+            html: `<div style="width:18px;height:18px;border-radius:50%;border:3px solid #fff;background:${first ? '#0095f6' : last && l.length > 1 ? '#16a34a' : '#f59e0b'}"></div>` }),
+        }).addTo(layer);
+        m.on('drag', (e) => { const ll = e.target.getLatLng(); l[i] = [+ll.lat.toFixed(6), +ll.lng.toFixed(6)]; });
+        m.on('dragend', () => { setDirty(); draw(); });
+      });
+    }
+    const l = lines[hole] || [];
+    let len = 0; for (let i = 1; i < l.length; i++) len += yards(l[i - 1], l[i]);
+    const card = apiYards[hole - 1];
+    $('holeInfo').innerHTML = `<b>Hole ${hole}</b> · par ${par[hole - 1]} · ${l.length} point(s)` +
+      (l.length >= 2 ? ` · line <b>${Math.round(len)} yd</b>` : '') + (card ? ` · card ${card} yd` : '') +
+      `<br><span class="muted">Blue = tee, green = green, orange = dogleg. Click the map to add the next point.</span>`;
+  }
+  map.on('click', (e) => {
+    if (!course) return;
+    (lines[hole] ||= []).push([+e.latlng.lat.toFixed(6), +e.latlng.lng.toFixed(6)]);
+    setDirty(); draw();
+  });
+  $('undo').onclick = () => { lines[hole]?.pop(); setDirty(); draw(); };
+  $('clear').onclick = () => { if (confirm(`Clear hole ${hole}?`)) { delete lines[hole]; setDirty(); draw(); } };
+  $('fit').onclick = fitCourse;
+  function fitCourse() {
+    const pts = Object.values(lines).flat();
+    if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.1));
+  }
+
+  // ---- scorecard
+  function renderCard() {
+    const row = (label, arr, from, to) => `<tr><th>${label}</th>${arr.slice(from, to).map((v, i) =>
+      `<td><input data-k="${label}" data-i="${from + i}" value="${v}"></td>`).join('')}</tr>`;
+    const head = (from, to) => `<tr><th></th>${Array.from({ length: to - from }, (_, i) => `<th>${from + i + 1}</th>`).join('')}</tr>`;
+    $('card').innerHTML = head(0, 9) + row('Par', par, 0, 9) + row('HCP', hcp, 0, 9) + head(9, 18) + row('Par', par, 9, 18) + row('HCP', hcp, 9, 18) +
+      `<tr><td colspan="10" class="muted" id="cardSum"></td></tr>`;
+    $('card').querySelectorAll('input').forEach((inp) => inp.oninput = () => {
+      const v = parseInt(inp.value, 10); if (!v) return;
+      (inp.dataset.k === 'Par' ? par : hcp)[+inp.dataset.i] = v; setDirty(); sumCard(); draw();
+    });
+    sumCard();
+  }
+  function sumCard() {
+    const okHcp = [...hcp].sort((a, b) => a - b).every((v, i) => v === i + 1);
+    $('cardSum').innerHTML = `Total par <b>${par.reduce((a, b) => a + b, 0)}</b> · handicaps ${okHcp ? '1–18 ✓' : '<span style="color:var(--bad)">must be 1–18 once each</span>'}`;
+  }
+
+  // ---- save
+  $('save').onclick = async () => {
+    if (!course || !auth.currentUser) return;
+    const key = courseKey(course.id);
+    const holes = {};
+    for (const [h, l] of Object.entries(lines)) if (l.length >= 2) holes[h] = { line: l, par: par[h - 1] };
+    const okHcp = [...hcp].sort((a, b) => a - b).every((v, i) => v === i + 1);
+    if (!okHcp && !confirm('Handicaps are not 1–18 once each. Save anyway?')) return;
+    $('saveStatus').textContent = 'Saving…';
+    try {
+      await db.ref(`courses/${key}`).update({
+        holes,
+        card: { par, hcp, source: `editor · ${auth.currentUser.email || auth.currentUser.uid}`, updated: Date.now() },
+      });
+      $('saveStatus').textContent = `Saved ${Object.keys(holes).length} holes and the scorecard. Players see it the next time they pick this course.`;
+      setDirty(false);
+    } catch (e) {
+      $('saveStatus').textContent = `Not saved: ${e.message}`;
+    }
+  };
+  window.onbeforeunload = () => (dirty ? 'Unsaved changes' : undefined);
+
+  // Deep link: editor.html?course=ID
+  const deep = new URLSearchParams(location.search).get('course');
+  if (deep) openCourse(deep);
+</script>
+</body>
+</html>
