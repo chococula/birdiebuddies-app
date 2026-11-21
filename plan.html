@@ -65,6 +65,17 @@
     footer { margin-top:28px; text-align:center; font-size:12px; color:var(--muted); }
     footer a { color:var(--accent2); }
     .empty { color:var(--dim); font-size:13px; padding:6px 0; }
+    .cal-month { font-weight:800; margin:6px 4px 6px; }
+    .cal { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:10px; }
+    .cal .wd { text-align:center; font-size:11px; font-weight:700; color:var(--dim); padding-bottom:2px; }
+    .cal .c { aspect-ratio:1; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+      font-weight:800; font-size:15px; border:1px solid transparent; background:transparent; color:var(--line2); padding:0; font-family:inherit; }
+    .cal .c.on { background:var(--card); border-color:var(--line2); color:var(--text); cursor:pointer; }
+    .cal .c.mine { background:var(--accent); border-color:var(--accent); color:#fff; }
+    .cal .c.conf { border:3px solid #15803d; }
+    .cal .c small { font-size:9px; font-weight:800; color:var(--muted); }
+    .cal .c.mine small { color:#fff; }
+    .cal .c.off { font-weight:400; cursor:default; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Grand+Hotel&display=swap" rel="stylesheet">
 </head>
@@ -85,7 +96,7 @@
     <div class="label">Your name</div>
     <input type="text" id="cName" maxlength="30">
     <div class="label" id="cDaysLabel">Days to choose from</div>
-    <div class="chips" id="cDays"></div>
+    <div id="cDays"></div>
     <div style="margin-top:18px"><button class="btn" id="cGo" style="width:100%">Create and get the link</button></div>
   </section>
 
@@ -100,7 +111,9 @@
     <div id="confirmed" style="margin-top:14px"></div>
     <div class="label">Your name</div>
     <div class="row"><input type="text" id="me" maxlength="30" placeholder="How friends know you"><button class="btn ghost small" id="saveName">Save</button></div>
-    <div class="label" id="daysLabel">Tap the days you can play</div>
+    <div class="label">Tap the days you can play</div>
+    <div id="cal"></div>
+    <div class="label" id="daysLabel">Who can play</div>
     <div id="days"></div>
     <div class="label">Chat</div>
     <div class="msgs" id="msgs"></div>
@@ -186,17 +199,47 @@
     return n;
   }
 
+  // Month grids: only the weeks that touch [first, last].
+  function calendar(el, { first, last, enabled, selected, counts, total, confirmed, onTap }) {
+    const start = parse(first), end = parse(last), months = [];
+    for (let m = new Date(start.getFullYear(), start.getMonth(), 1); m <= end; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) months.push(m);
+    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    let html = '';
+    for (const m of months) {
+      const days = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
+      const slots = [...Array(m.getDay()).fill(null), ...[...Array(days)].map((_, i) => new Date(m.getFullYear(), m.getMonth(), i + 1))];
+      while (slots.length % 7) slots.push(null);
+      let cells = '';
+      for (let i = 0; i < slots.length; i += 7) {
+        const week = slots.slice(i, i + 7);
+        if (!week.some(d => d && d >= start && d <= end)) continue;
+        cells += week.map(d => {
+          if (!d) return '<div></div>';
+          const key = iso(d), active = d >= start && d <= end && (!enabled || enabled.has(key));
+          const n = counts ? counts[key] || 0 : 0, mine = selected.has(key);
+          const heat = enabled && total && n && !mine ? ` style="background:rgba(26,143,60,${(0.12 + 0.5 * n / total).toFixed(2)})"` : '';
+          const sub = enabled && active ? `<small>${total && n === total ? 'ALL' : `${n}/${total}`}</small>` : '';
+          return `<button class="c ${active ? 'on' : 'off'} ${mine ? 'mine' : ''} ${confirmed === key ? 'conf' : ''}"${heat} data-d="${active ? key : ''}" ${active ? '' : 'disabled'} aria-label="${label(key)}">${d.getDate()}${sub}</button>`;
+        }).join('');
+      }
+      html += `<div class="cal-month">${MONTHS[m.getMonth()]} ${m.getFullYear()}</div><div class="cal">` +
+        ['S','M','T','W','T','F','S'].map(w => `<div class="wd">${w}</div>`).join('') + cells + '</div>';
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('button[data-d]').forEach(b => { if (b.dataset.d) b.onclick = () => onTap(b.dataset.d); });
+  }
+
   // ------------------------------------------------------------ create
   function setupCreate() {
     show('create');
     $('cName').value = store.get('name', '');
     const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() + 1);
-    const choices = [...Array(28)].map((_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); return iso(d); });
+    const choices = [...Array(42)].map((_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); return iso(d); });
     const picked = new Set(choices.filter(d => parse(d).getDay() % 6 === 0).slice(0, 4));
     const draw = () => {
-      $('cDaysLabel').textContent = `Days to choose from (${picked.size})`;
-      $('cDays').innerHTML = choices.map(d => `<button class="chip ${picked.has(d) ? 'on' : ''}" data-d="${d}">${label(d)}</button>`).join('');
-      $('cDays').querySelectorAll('button').forEach(b => b.onclick = () => { const d = b.dataset.d; picked.has(d) ? picked.delete(d) : picked.add(d); draw(); });
+      $('cDaysLabel').textContent = `Tap the days to choose from (${picked.size})`;
+      calendar($('cDays'), { first: choices[0], last: choices[choices.length - 1], selected: picked,
+        onTap: d => { picked.has(d) ? picked.delete(d) : picked.add(d); draw(); } });
     };
     draw();
     $('cGo').onclick = async () => {
@@ -326,7 +369,11 @@
     document.title = `${meta.title} · BirdieBro`;
     $('pTitle').textContent = meta.title;
     $('pSub').textContent = [meta.course ? '⛳ ' + meta.course : '', 'Code ' + code, people.length + ' joined'].filter(Boolean).join(' · ');
-    $('daysLabel').textContent = organizer ? 'Tap the days you can play · ✓ to confirm' : 'Tap the days you can play';
+    $('daysLabel').textContent = organizer ? 'Who can play · ✓ to confirm' : 'Who can play';
+    const sorted = [...dates].sort();
+    if (sorted.length) calendar($('cal'), { first: sorted[0], last: sorted[sorted.length - 1], enabled: new Set(dates),
+      selected: me ? me.days : new Set(), counts: Object.fromEntries(dates.map(d => [d, avail[d].length])), total: people.length,
+      confirmed: meta.confirmed, onTap: toggle });
 
     const day = meta.confirmed;
     $('confirmed').innerHTML = day ? `<div class="card"><h2>✅ ${label(day)} — it's on!</h2>
