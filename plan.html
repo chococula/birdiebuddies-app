@@ -45,7 +45,9 @@
     .card h2 { margin:0 0 2px; font-size:18px; }
     .card .chips { margin-top:10px; }
     .msgs { display:flex; flex-direction:column; gap:6px; }
-    .bubble { max-width:78%; padding:8px 12px; border-radius:16px; background:var(--line); align-self:flex-start; white-space:pre-wrap; word-wrap:break-word; position:relative; }
+    .bubble { max-width:78%; padding:8px 12px; border-radius:16px; background:var(--line); align-self:flex-start; word-wrap:break-word; position:relative; }
+    .bubble .txt { white-space:pre-wrap; }
+    a.btn { text-decoration:none; display:inline-block; }
     .bubble.mine { align-self:flex-end; background:var(--accent); color:#fff; }
     .bubble .who { font-size:11px; font-weight:700; color:var(--muted); }
     .bubble .more { position:absolute; top:2px; right:6px; border:0; background:none; color:inherit; opacity:.5; font-size:14px; padding:0 2px; }
@@ -352,9 +354,9 @@
     $('unhideWrap').classList.toggle('hidden', !blocked.size);
     const msgs = Object.entries(state.msgs || {}).map(([id, m]) => ({ id, ...m })).filter(m => !blocked.has(m.uid))
       .sort((a, b) => (a.t || 0) - (b.t || 0) || (a.id < b.id ? -1 : 1));
-    $('msgs').innerHTML = msgs.length ? msgs.map(m => `<div class="bubble ${m.uid === uid ? 'mine' : ''}">
-        ${m.uid === uid ? '' : `<div class="who">${esc(m.name)}${m.uid === meta.organizer ? ' · organizer' : ''}</div>`}${esc(m.text)}
-        <button class="more" data-m="${esc(m.id)}" aria-label="More">⋯</button></div>`).join('')
+    $('msgs').innerHTML = msgs.length ? msgs.map(m => `<div class="bubble ${m.uid === uid ? 'mine' : ''}">` +
+        (m.uid === uid ? '' : `<div class="who">${esc(m.name)}${m.uid === meta.organizer ? ' · organizer' : ''}</div>`) +
+        `<div class="txt">${esc(m.text)}</div><button class="more" data-m="${esc(m.id)}" aria-label="More">⋯</button></div>`).join('')
       : '<div class="empty">No messages yet. Say hi, or note times that work.</div>';
     $('msgs').querySelectorAll('.more').forEach(b => b.onclick = () => messageActions(b.dataset.m));
     if (msgs.length !== lastMsgCount) { lastMsgCount = msgs.length; window.scrollTo(0, document.body.scrollHeight); }
