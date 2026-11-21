@@ -65,6 +65,12 @@
     footer { margin-top:28px; text-align:center; font-size:12px; color:var(--muted); }
     footer a { color:var(--accent2); }
     .empty { color:var(--dim); font-size:13px; padding:6px 0; }
+    #cSuggest .opt { display:block; width:100%; text-align:left; border:0; border-bottom:1px solid var(--line); background:#fff; padding:10px 12px; font:inherit; cursor:pointer; }
+    #cSuggest .opt small { color:var(--muted); display:block; }
+    #cSuggest { border:1px solid var(--line2); border-top:0; border-radius:0 0 12px 12px; overflow:hidden; }
+    #cSuggest:empty { display:none; }
+    .cal .c.add { border:1px solid var(--line); color:var(--muted); font-weight:400; cursor:pointer; background:#fff; }
+    .cal .c.add small { color:var(--dim); font-weight:800; }
     .cal-month { font-weight:800; margin:6px 4px 6px; }
     .cal { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:10px; }
     .cal .wd { text-align:center; font-size:11px; font-weight:700; color:var(--dim); padding-bottom:2px; }
@@ -90,7 +96,8 @@
     <div class="label">Plan name</div>
     <input type="text" id="cTitle" maxlength="80" value="Golf with the group">
     <div class="label">Course (optional)</div>
-    <input type="text" id="cCourse" maxlength="80">
+    <input type="text" id="cCourse" maxlength="80" placeholder="Search courses (e.g. Callippe)" autocomplete="off">
+    <div id="cSuggest"></div>
     <div class="label">Tee time booking link (optional)</div>
     <input type="url" id="cBooking" maxlength="300" placeholder="https://">
     <div class="label">Your name</div>
@@ -111,7 +118,7 @@
     <div id="confirmed" style="margin-top:14px"></div>
     <div class="label">Your name</div>
     <div class="row"><input type="text" id="me" maxlength="30" placeholder="How friends know you"><button class="btn ghost small" id="saveName">Save</button></div>
-    <div class="label">Tap the days you can play</div>
+    <div class="label">Tap the days you can play · + to add a day</div>
     <div id="cal"></div>
     <div class="label" id="daysLabel">Who can play</div>
     <div id="days"></div>
@@ -200,7 +207,8 @@
   }
 
   // Month grids: only the weeks that touch [first, last].
-  function calendar(el, { first, last, enabled, selected, counts, total, confirmed, onTap }) {
+  function calendar(el, { first, last, enabled, selected, counts, total, confirmed, onTap, onAdd }) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
     const start = parse(first), end = parse(last), months = [];
     for (let m = new Date(start.getFullYear(), start.getMonth(), 1); m <= end; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) months.push(m);
     const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -216,6 +224,8 @@
         cells += week.map(d => {
           if (!d) return '<div></div>';
           const key = iso(d), active = d >= start && d <= end && (!enabled || enabled.has(key));
+          if (!active && onAdd && d >= start && d <= end && d >= today)
+            return `<button class="c add" data-add="${key}" aria-label="Add ${label(key)}">${d.getDate()}<small>+</small></button>`;
           const n = counts ? counts[key] || 0 : 0, mine = selected.has(key);
           const heat = enabled && total && n && !mine ? ` style="background:rgba(26,143,60,${(0.12 + 0.5 * n / total).toFixed(2)})"` : '';
           const sub = enabled && active ? `<small>${total && n === total ? 'ALL' : `${n}/${total}`}</small>` : '';
@@ -227,11 +237,34 @@
     }
     el.innerHTML = html;
     el.querySelectorAll('button[data-d]').forEach(b => { if (b.dataset.d) b.onclick = () => onTap(b.dataset.d); });
+    el.querySelectorAll('button[data-add]').forEach(b => b.onclick = () => onAdd(b.dataset.add));
   }
 
   // ------------------------------------------------------------ create
+  // Our course list (same file the app uses), loaded when the course box is first used.
+  let catalog = null, pickedCourse = null;
+  async function courses() {
+    if (!catalog) catalog = fetch('data/courses-us.json').then(r => r.json()).then(j => j.courses).catch(() => []);
+    return catalog;
+  }
+  const norm = s => String(s).toLowerCase().replace(/[^a-z0-9가-힣]/g, '');
+  async function suggest() {
+    const q = norm($('cCourse').value);
+    pickedCourse = null;
+    if (q.length < 3) { $('cSuggest').innerHTML = ''; return; }
+    const list = (await courses()).filter(c => norm(c[1]).includes(q) || norm(c[1] + c[2]).includes(q)).slice(0, 8);
+    if (norm($('cCourse').value) !== q) return;
+    $('cSuggest').innerHTML = list.map((c, i) => `<button class="opt" data-i="${i}">${esc(c[1])}<small>${esc([c[2], c[3]].filter(Boolean).join(', '))}</small></button>`).join('');
+    $('cSuggest').querySelectorAll('button').forEach(b => b.onclick = () => {
+      pickedCourse = list[b.dataset.i];
+      $('cCourse').value = pickedCourse[1];
+      $('cSuggest').innerHTML = '';
+    });
+  }
+
   function setupCreate() {
     show('create');
+    $('cCourse').addEventListener('input', suggest);
     $('cName').value = store.get('name', '');
     const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() + 1);
     const choices = [...Array(42)].map((_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); return iso(d); });
@@ -255,6 +288,7 @@
       try {
         await db.ref(`plans/${c}/meta`).set({
           title: clean($('cTitle').value, 80) || 'Golf round', course: clean($('cCourse').value, 80),
+          courseId: pickedCourse && pickedCourse[1] === $('cCourse').value ? pickedCourse[0] : '',
           bookingUrl: booking.length <= 300 ? booking : '', dates: choices.filter(d => picked.has(d)).join(','),
           organizer: uid, createdAt: firebase.database.ServerValue.TIMESTAMP, confirmed: ''
         });
@@ -298,6 +332,17 @@
     const me = (state.people || {})[uid];
     const set = new Set(days(me && me.days));
     set.has(day) ? set.delete(day) : set.add(day);
+    await db.ref(`plans/${code}/people/${uid}`).set({ name: n, days: [...set].sort().join(','), t: me && me.t ? me.t : firebase.database.ServerValue.TIMESTAMP });
+  }
+
+  // Anyone can offer another day; they're marked as able to play it.
+  async function addDay(day) {
+    const n = myName(); if (!n) return;
+    if (!await needRules()) return;
+    if (!confirm(`Add ${label(day)}? Everyone will see it as another option.`)) return;
+    await db.ref(`plans/${code}/extra/${day}`).set({ by: uid, t: firebase.database.ServerValue.TIMESTAMP });
+    const me = (state.people || {})[uid];
+    const set = new Set(days(me && me.days)); set.add(day);
     await db.ref(`plans/${code}/people/${uid}`).set({ name: n, days: [...set].sort().join(','), t: me && me.t ? me.t : firebase.database.ServerValue.TIMESTAMP });
   }
 
@@ -360,7 +405,9 @@
   function render() {
     if (!state || !state.meta) { show('status'); $('status').textContent = `No plan found for ${code}.`; $('composer').classList.add('hidden'); return; }
     show('plan'); $('composer').classList.remove('hidden');
-    const meta = state.meta, dates = days(meta.dates), organizer = meta.organizer === uid;
+    const meta = state.meta, organizer = meta.organizer === uid;
+    // The organizer's days plus any day someone added later.
+    const dates = [...new Set([...days(meta.dates), ...days(Object.keys(state.extra || {}).join(','))])].sort();
     const people = Object.entries(state.people || {}).map(([id, p]) => ({ id, name: p.name, days: new Set(days(p.days)), t: p.t || 0 })).sort((a, b) => a.t - b.t);
     const avail = Object.fromEntries(dates.map(d => [d, people.filter(p => p.days.has(d)).map(p => p.name)]));
     const top = Math.max(0, ...dates.map(d => avail[d].length));
@@ -371,7 +418,10 @@
     $('pSub').textContent = [meta.course ? '⛳ ' + meta.course : '', 'Code ' + code, people.length + ' joined'].filter(Boolean).join(' · ');
     $('daysLabel').textContent = organizer ? 'Who can play · ✓ to confirm' : 'Who can play';
     const sorted = [...dates].sort();
-    if (sorted.length) calendar($('cal'), { first: sorted[0], last: sorted[sorted.length - 1], enabled: new Set(dates),
+    const todayIso = iso(new Date()), horizonD = new Date(); horizonD.setDate(horizonD.getDate() + 41);
+    const horizon = iso(horizonD);
+    if (sorted.length) calendar($('cal'), { first: sorted[0] < todayIso ? sorted[0] : todayIso,
+      last: sorted[sorted.length - 1] > horizon ? sorted[sorted.length - 1] : horizon, enabled: new Set(dates), onAdd: addDay,
       selected: me ? me.days : new Set(), counts: Object.fromEntries(dates.map(d => [d, avail[d].length])), total: people.length,
       confirmed: meta.confirmed, onTap: toggle });
 
