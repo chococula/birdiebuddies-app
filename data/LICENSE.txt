@@ -1,0 +1,2 @@
+Course data: OpenGolfAPI (https://github.com/opengolfapi/data), ODbL 1.0.
+© OpenStreetMap contributors. Built by golf_sticks/tool/build_catalog.py.
