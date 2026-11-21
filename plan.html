@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>BirdieBro · Plan a round</title>
+  <meta name="theme-color" content="#0095f6">
+  <meta property="og:title" content="Pick the days you can play ⛳">
+  <meta property="og:description" content="Tick your days and chat with the group on BirdieBro.">
+  <style>
+    :root { --bg:#fff; --card:#fafafa; --line:#efefef; --line2:#dbdbdb; --muted:#737373; --dim:#8e8e8e;
+      --text:#262626; --accent:#0095f6; --accent2:#0074cc; --green:#1a8f3c; --amber:#c2410c; --rose:#ed4956; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:15px/1.4 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; }
+    .wrap { max-width:640px; margin:0 auto; padding:16px 16px 110px; }
+    header { display:flex; align-items:center; gap:8px; padding:6px 0 12px; border-bottom:1px solid var(--line2); margin-bottom:14px; }
+    .logo { font:400 30px/1 "Grand Hotel", cursive; }
+    h1 { font-size:22px; margin:0 0 2px; font-weight:800; }
+    .muted { color:var(--muted); font-size:13px; }
+    .label { font-size:11px; font-weight:700; letter-spacing:1.2px; color:var(--muted); text-transform:uppercase; margin:18px 0 8px; }
+    input[type=text], input[type=url] { width:100%; font:inherit; padding:11px 12px; border:1px solid var(--line2); border-radius:12px; background:var(--card); }
+    input:focus { outline:none; border-color:var(--accent); }
+    button { font:inherit; cursor:pointer; }
+    .btn { background:var(--accent); color:#fff; border:0; border-radius:12px; padding:12px 16px; font-weight:700; }
+    .btn:disabled { opacity:.5; }
+    .btn.ghost { background:transparent; color:var(--accent2); border:1px solid var(--line2); }
+    .btn.small { padding:8px 12px; font-size:13px; }
+    .row { display:flex; gap:8px; align-items:center; }
+    .chips { display:flex; flex-wrap:wrap; gap:6px; }
+    .chip { border:1px solid var(--line2); background:#fff; border-radius:999px; padding:7px 12px; font-size:13px; }
+    .chip.on { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:700; }
+    .day { display:flex; align-items:center; gap:10px; border:1px solid var(--line); background:var(--card); border-radius:14px; padding:10px 8px 10px 12px; margin-bottom:8px; }
+    .day.mine { border-color:var(--accent); background:#e6f4fe; }
+    .day.confirmed { border:2px solid var(--green); }
+    .day .tick { width:24px; height:24px; border-radius:50%; border:2px solid var(--dim); flex:none; display:grid; place-items:center; color:#fff; font-size:14px; }
+    .day.mine .tick { background:var(--accent); border-color:var(--accent); }
+    .day .main { flex:1; min-width:0; cursor:pointer; }
+    .day .when { font-weight:800; }
+    .day .who { font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .day .count { font-weight:800; }
+    .tag { font-size:9px; font-weight:900; color:#fff; border-radius:8px; padding:1px 6px; margin-left:6px; vertical-align:2px; }
+    .tag.all { background:var(--green); } .tag.most { background:var(--amber); }
+    .confirm { border:0; background:none; font-size:20px; padding:4px 6px; }
+    .card { border:1px solid rgba(26,143,60,.4); background:rgba(26,143,60,.07); border-radius:14px; padding:12px; margin-bottom:6px; }
+    .card h2 { margin:0 0 2px; font-size:18px; }
+    .card .chips { margin-top:10px; }
+    .msgs { display:flex; flex-direction:column; gap:6px; }
+    .bubble { max-width:78%; padding:8px 12px; border-radius:16px; background:var(--line); align-self:flex-start; white-space:pre-wrap; word-wrap:break-word; position:relative; }
+    .bubble.mine { align-self:flex-end; background:var(--accent); color:#fff; }
+    .bubble .who { font-size:11px; font-weight:700; color:var(--muted); }
+    .bubble .more { position:absolute; top:2px; right:6px; border:0; background:none; color:inherit; opacity:.5; font-size:14px; padding:0 2px; }
+    .bubble.mine .more { right:auto; left:-22px; color:var(--dim); }
+    .composer { position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--line2); padding:10px 12px calc(10px + env(safe-area-inset-bottom)); }
+    .composer .row { max-width:640px; margin:0 auto; }
+    .modal { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:flex-end; justify-content:center; z-index:9; }
+    .modal.open { display:flex; }
+    .sheet { background:#fff; width:100%; max-width:520px; border-radius:18px 18px 0 0; padding:18px 16px calc(18px + env(safe-area-inset-bottom)); }
+    .sheet h3 { margin:0 0 8px; }
+    .sheet .opt { display:block; width:100%; text-align:left; border:0; background:none; padding:13px 4px; border-bottom:1px solid var(--line); font-size:15px; }
+    .sheet .opt.danger { color:var(--rose); }
+    .share { border:1px dashed var(--line2); border-radius:12px; padding:10px 12px; word-break:break-all; font-size:13px; }
+    .hidden { display:none !important; }
+    footer { margin-top:28px; text-align:center; font-size:12px; color:var(--muted); }
+    footer a { color:var(--accent2); }
+    .empty { color:var(--dim); font-size:13px; padding:6px 0; }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Grand+Hotel&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="wrap">
+  <header><span style="font-size:22px">⛳</span><span class="logo">BirdieBro</span></header>
+
+  <!-- New plan -->
+  <section id="create" class="hidden">
+    <h1>Plan a round</h1>
+    <div class="muted">Share a link, everyone ticks the days they can play and chats, then you pick the day.</div>
+    <div class="label">Plan name</div>
+    <input type="text" id="cTitle" maxlength="80" value="Golf with the group">
+    <div class="label">Course (optional)</div>
+    <input type="text" id="cCourse" maxlength="80">
+    <div class="label">Tee time booking link (optional)</div>
+    <input type="url" id="cBooking" maxlength="300" placeholder="https://">
+    <div class="label">Your name</div>
+    <input type="text" id="cName" maxlength="30">
+    <div class="label" id="cDaysLabel">Days to choose from</div>
+    <div class="chips" id="cDays"></div>
+    <div style="margin-top:18px"><button class="btn" id="cGo" style="width:100%">Create and get the link</button></div>
+  </section>
+
+  <!-- One plan -->
+  <section id="plan" class="hidden">
+    <h1 id="pTitle"></h1>
+    <div class="muted" id="pSub"></div>
+    <div id="shareBox" class="hidden" style="margin-top:12px">
+      <div class="share" id="shareUrl"></div>
+      <div class="row" style="margin-top:8px"><button class="btn small" id="shareBtn">Share link</button><span class="muted" id="copied"></span></div>
+    </div>
+    <div id="confirmed" style="margin-top:14px"></div>
+    <div class="label">Your name</div>
+    <div class="row"><input type="text" id="me" maxlength="30" placeholder="How friends know you"><button class="btn ghost small" id="saveName">Save</button></div>
+    <div class="label" id="daysLabel">Tap the days you can play</div>
+    <div id="days"></div>
+    <div class="label">Chat</div>
+    <div class="msgs" id="msgs"></div>
+    <footer>
+      <a href="https://apps.apple.com/app/birdiebro/id6819088686">Get BirdieBro on the App Store</a> ·
+      <a href="terms.html">Terms</a> · <a href="privacy.html">Privacy</a><br>
+      <span id="unhideWrap" class="hidden"><a href="#" id="unhide">Show hidden people again</a></span>
+    </footer>
+  </section>
+
+  <section id="status" class="muted" style="padding:40px 0;text-align:center">Loading…</section>
+</div>
+
+<div class="composer hidden" id="composer">
+  <div class="row"><input type="text" id="msg" maxlength="300" placeholder="Message" enterkeyhint="send"><button class="btn" id="send">Send</button></div>
+</div>
+
+<div class="modal" id="rules"><div class="sheet">
+  <h3>Plan with friends</h3>
+  <p class="muted" style="font-size:14px">Your name, the days you pick and your messages are shared with everyone who has this plan's link.</p>
+  <p class="muted" style="font-size:14px">Be kind: no harassment, hate, threats, sexual content or spam. Tap ⋯ on a message to report it or to hide someone.
+     Reported content is reviewed within 24 hours and people who break these rules are removed. See the <a href="terms.html">Terms</a>.</p>
+  <div class="row" style="justify-content:flex-end;margin-top:10px">
+    <button class="btn ghost small" id="rulesNo">Cancel</button><button class="btn small" id="rulesYes">I agree</button>
+  </div>
+</div></div>
+
+<div class="modal" id="actions"><div class="sheet" id="actionsBody"></div></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script>
+  // Same data as the app (lib/services/plan_sync.dart): plans/CODE/{meta,people,msgs}, reports/ID.
+  firebase.initializeApp({
+    apiKey: 'AIzaSyAsUysaXZT8ULihIgqqZ7jQz1MePxq94u4',
+    authDomain: 'birdiebuddies-chococula.firebaseapp.com',
+    databaseURL: 'https://birdiebuddies-chococula-default-rtdb.firebaseio.com',
+    projectId: 'birdiebuddies-chococula',
+    appId: '1:376908649955:web:6c557a508c90a170293cd6'
+  });
+  const db = firebase.database();
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('bb_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('bb_' + k, JSON.stringify(v)); } catch (e) {} }
+  };
+
+  // Keep in sync with kBlockedWords in plan_sync.dart.
+  const BLOCKED = ['fuck','shit','bitch','cunt','asshole','bastard','pussy','slut','whore','nigger','nigga','faggot','retard','motherfucker',
+    '씨발','시발','씨빨','썅','병신','븅신','좆','개새끼','새끼','지랄','미친놈','미친년','닥쳐','꺼져','엠창','느금'];
+  function clean(text, max) {
+    let out = String(text || '').trim().slice(0, max || 300);
+    for (const w of BLOCKED) out = out.replace(new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '*'.repeat(w.length));
+    return out;
+  }
+  const NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const parse = iso => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d); };
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const label = s => { const d = parse(s); return `${NAMES[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`; };
+  const days = v => String(v || '').split(',').map(s => s.trim()).filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s));
+  const newCode = () => { const c = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s = 'P'; for (let i = 0; i < 4; i++) s += c[Math.floor(Math.random() * c.length)]; return s; };
+  const planLink = code => `${location.origin}${location.pathname}?p=${code}`;
+
+  const code = (new URLSearchParams(location.search).get('p') || '').trim().toUpperCase();
+  let uid = null, state = null, lastMsgCount = -1;
+
+  function show(id) { ['create', 'plan', 'status'].forEach(s => $(s).classList.toggle('hidden', s !== id)); }
+
+  function needRules() {
+    if (store.get('rules', false)) return Promise.resolve(true);
+    return new Promise(resolve => {
+      $('rules').classList.add('open');
+      $('rulesYes').onclick = () => { store.set('rules', true); $('rules').classList.remove('open'); resolve(true); };
+      $('rulesNo').onclick = () => { $('rules').classList.remove('open'); resolve(false); };
+    });
+  }
+  function myName() {
+    const n = clean($('me').value, 30);
+    if (!n) { $('me').focus(); $('me').placeholder = 'Add your name first'; return null; }
+    store.set('name', n);
+    return n;
+  }
+
+  // ------------------------------------------------------------ create
+  function setupCreate() {
+    show('create');
+    $('cName').value = store.get('name', '');
+    const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() + 1);
+    const choices = [...Array(28)].map((_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); return iso(d); });
+    const picked = new Set(choices.filter(d => parse(d).getDay() % 6 === 0).slice(0, 4));
+    const draw = () => {
+      $('cDaysLabel').textContent = `Days to choose from (${picked.size})`;
+      $('cDays').innerHTML = choices.map(d => `<button class="chip ${picked.has(d) ? 'on' : ''}" data-d="${d}">${label(d)}</button>`).join('');
+      $('cDays').querySelectorAll('button').forEach(b => b.onclick = () => { const d = b.dataset.d; picked.has(d) ? picked.delete(d) : picked.add(d); draw(); });
+    };
+    draw();
+    $('cGo').onclick = async () => {
+      const name = clean($('cName').value, 30);
+      if (!name) return $('cName').focus();
+      if (!picked.size) return alert('Pick at least one day.');
+      if (!uid) return alert('Still connecting. Try again in a moment.');
+      if (!await needRules()) return;
+      let booking = $('cBooking').value.trim();
+      if (booking && !/^https?:/.test(booking)) booking = 'https://' + booking;
+      const c = newCode();
+      $('cGo').disabled = true;
+      try {
+        await db.ref(`plans/${c}/meta`).set({
+          title: clean($('cTitle').value, 80) || 'Golf round', course: clean($('cCourse').value, 80),
+          bookingUrl: booking.length <= 300 ? booking : '', dates: choices.filter(d => picked.has(d)).join(','),
+          organizer: uid, createdAt: firebase.database.ServerValue.TIMESTAMP, confirmed: ''
+        });
+        await db.ref(`plans/${c}/people/${uid}`).set({ name, days: '', t: firebase.database.ServerValue.TIMESTAMP });
+        store.set('name', name);
+        store.set('justMade', c);
+        location.href = planLink(c);
+      } catch (e) {
+        alert('Could not create the plan. Check your connection and try again.');
+        $('cGo').disabled = false;
+      }
+    };
+  }
+
+  // ------------------------------------------------------------ one plan
+  function watchPlan() {
+    $('me').value = store.get('name', '');
+    if (store.get('justMade', '') === code) { $('shareBox').classList.remove('hidden'); store.set('justMade', ''); }
+    $('shareUrl').textContent = planLink(code);
+    $('shareBtn').onclick = async () => {
+      const text = `⛳ ${state ? state.meta.title : 'Golf'} — pick the days you can play: ${planLink(code)}`;
+      if (navigator.share) { try { await navigator.share({ text }); } catch (e) {} }
+      else { try { await navigator.clipboard.writeText(planLink(code)); $('copied').textContent = 'Copied!'; } catch (e) {} }
+    };
+    $('saveName').onclick = async () => {
+      const n = myName(); if (!n || !state) return;
+      if (!await needRules()) return;
+      const me = (state.people || {})[uid];
+      await db.ref(`plans/${code}/people/${uid}`).set({ name: n, days: me ? me.days || '' : '', t: me && me.t ? me.t : firebase.database.ServerValue.TIMESTAMP });
+    };
+    $('send').onclick = send;
+    $('msg').addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+    $('unhide').onclick = e => { e.preventDefault(); store.set('blocked', []); render(); };
+    db.ref('plans/' + code).on('value', s => { state = s.val(); render(); },
+      () => { show('status'); $('status').textContent = 'Could not load this plan.'; });
+  }
+
+  async function toggle(day) {
+    const n = myName(); if (!n) return;
+    if (!await needRules()) return;
+    const me = (state.people || {})[uid];
+    const set = new Set(days(me && me.days));
+    set.has(day) ? set.delete(day) : set.add(day);
+    await db.ref(`plans/${code}/people/${uid}`).set({ name: n, days: [...set].sort().join(','), t: me && me.t ? me.t : firebase.database.ServerValue.TIMESTAMP });
+  }
+
+  async function send() {
+    const text = clean($('msg').value, 300);
+    if (!text || !state) return;
+    const n = myName(); if (!n) return;
+    if (!await needRules()) return;
+    $('msg').value = '';
+    if (!(state.people || {})[uid]) await db.ref(`plans/${code}/people/${uid}`).set({ name: n, days: '', t: firebase.database.ServerValue.TIMESTAMP });
+    await db.ref(`plans/${code}/msgs`).push({ uid, name: n, text, t: firebase.database.ServerValue.TIMESTAMP });
+  }
+
+  async function confirmDay(day) {
+    const undo = state.meta.confirmed === day;
+    if (!confirm(undo ? `Undo ${label(day)}?` : `Play on ${label(day)}? Everyone will see this day as confirmed.`)) return;
+    await db.ref(`plans/${code}/meta/confirmed`).set(undo ? '' : day);
+  }
+
+  function messageActions(id) {
+    const m = state.msgs[id]; if (!m) return;
+    const mine = m.uid === uid, organizer = state.meta.organizer === uid;
+    const opts = [];
+    if (!mine) {
+      opts.push(['Report message', 'danger', async () => {
+        await db.ref('reports').push({ plan: code, msg: id, author: m.uid, text: m.text, by: uid, t: firebase.database.ServerValue.TIMESTAMP });
+        store.set('blocked', [...new Set([...store.get('blocked', []), m.uid])]);
+        alert(`Thanks. We'll review it within 24 hours. You won't see messages from ${m.name} anymore.`);
+      }]);
+      opts.push([`Hide ${esc(m.name)}`, 'danger', () => store.set('blocked', [...new Set([...store.get('blocked', []), m.uid])])]);
+    }
+    if (mine || organizer) opts.push(['Delete message', '', () => db.ref(`plans/${code}/msgs/${id}`).remove()]);
+    if (organizer && !mine && (state.people || {})[m.uid]) opts.push([`Remove ${esc(m.name)} from the plan`, 'danger', () => db.ref(`plans/${code}/people/${m.uid}`).remove()]);
+    opts.push(['Cancel', '', () => {}]);
+    $('actionsBody').innerHTML = `<p class="muted" style="margin:0 0 6px">${esc(m.text).slice(0, 140)}</p>` +
+      opts.map((o, i) => `<button class="opt ${o[1]}" data-i="${i}">${o[0]}</button>`).join('');
+    $('actionsBody').querySelectorAll('button').forEach(b => b.onclick = async () => {
+      $('actions').classList.remove('open'); await opts[b.dataset.i][2](); render();
+    });
+    $('actions').classList.add('open');
+  }
+  $('actions').onclick = e => { if (e.target.id === 'actions') $('actions').classList.remove('open'); };
+
+  function icsUrl(meta, day) {
+    const d = parse(day), n = new Date(d); n.setDate(n.getDate() + 1);
+    const c = x => iso(x).replace(/-/g, '');
+    const body = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//BirdieBro//Plan//EN', 'BEGIN:VEVENT', `UID:${code}-${day}@birdiebro`,
+      `DTSTART;VALUE=DATE:${c(d)}`, `DTEND;VALUE=DATE:${c(n)}`, `SUMMARY:⛳ ${meta.title}`,
+      meta.course ? `LOCATION:${meta.course}` : '', `DESCRIPTION:${planLink(code)}`, 'END:VEVENT', 'END:VCALENDAR'].filter(Boolean).join('\r\n');
+    return 'data:text/calendar;charset=utf-8,' + encodeURIComponent(body);
+  }
+  function gcalUrl(meta, day) {
+    const d = parse(day), n = new Date(d); n.setDate(n.getDate() + 1);
+    const c = x => iso(x).replace(/-/g, '');
+    const q = new URLSearchParams({ action: 'TEMPLATE', text: '⛳ ' + meta.title, dates: `${c(d)}/${c(n)}`, details: planLink(code) });
+    if (meta.course) q.set('location', meta.course);
+    return 'https://calendar.google.com/calendar/render?' + q;
+  }
+
+  function render() {
+    if (!state || !state.meta) { show('status'); $('status').textContent = `No plan found for ${code}.`; $('composer').classList.add('hidden'); return; }
+    show('plan'); $('composer').classList.remove('hidden');
+    const meta = state.meta, dates = days(meta.dates), organizer = meta.organizer === uid;
+    const people = Object.entries(state.people || {}).map(([id, p]) => ({ id, name: p.name, days: new Set(days(p.days)), t: p.t || 0 })).sort((a, b) => a.t - b.t);
+    const avail = Object.fromEntries(dates.map(d => [d, people.filter(p => p.days.has(d)).map(p => p.name)]));
+    const top = Math.max(0, ...dates.map(d => avail[d].length));
+    const me = people.find(p => p.id === uid);
+    if (me && !$('me').value) $('me').value = me.name;
+    document.title = `${meta.title} · BirdieBro`;
+    $('pTitle').textContent = meta.title;
+    $('pSub').textContent = [meta.course ? '⛳ ' + meta.course : '', 'Code ' + code, people.length + ' joined'].filter(Boolean).join(' · ');
+    $('daysLabel').textContent = organizer ? 'Tap the days you can play · ✓ to confirm' : 'Tap the days you can play';
+
+    const day = meta.confirmed;
+    $('confirmed').innerHTML = day ? `<div class="card"><h2>✅ ${label(day)} — it's on!</h2>
+      <div class="muted">${esc((avail[day] || []).join(', '))}</div>
+      <div class="chips"><a class="btn small" href="${icsUrl(meta, day)}" download="birdiebro-${day}.ics">📅 Apple / Outlook calendar</a>
+      <a class="btn ghost small" href="${gcalUrl(meta, day)}" target="_blank" rel="noopener">Google Calendar</a>
+      ${meta.bookingUrl ? `<a class="btn ghost small" href="${esc(meta.bookingUrl)}" target="_blank" rel="noopener nofollow">🏌️ Book tee time</a>` : ''}</div></div>` : '';
+
+    $('days').innerHTML = dates.map(d => {
+      const n = avail[d], mine = me && me.days.has(d), all = people.length && n.length === people.length;
+      const tag = all ? '<span class="tag all">EVERYONE</span>' : (n.length > 1 && n.length === top ? '<span class="tag most">MOST</span>' : '');
+      return `<div class="day ${mine ? 'mine' : ''} ${day === d ? 'confirmed' : ''}">
+        <div class="tick">${mine ? '✓' : ''}</div>
+        <div class="main" data-d="${d}"><div class="when">${label(d)}${tag}</div><div class="who">${esc(n.join(', '))}</div></div>
+        <div class="count">${n.length}/${people.length}</div>
+        ${organizer ? `<button class="confirm" data-c="${d}" title="${day === d ? 'Undo' : 'Confirm this day'}">${day === d ? '↩️' : '✅'}</button>` : ''}</div>`;
+    }).join('');
+    $('days').querySelectorAll('.day').forEach(el => {
+      const main = el.querySelector('.main');
+      el.querySelector('.tick').onclick = main.onclick = () => toggle(main.dataset.d);
+    });
+    $('days').querySelectorAll('.confirm').forEach(b => b.onclick = () => confirmDay(b.dataset.c));
+
+    const blocked = new Set(store.get('blocked', []));
+    $('unhideWrap').classList.toggle('hidden', !blocked.size);
+    const msgs = Object.entries(state.msgs || {}).map(([id, m]) => ({ id, ...m })).filter(m => !blocked.has(m.uid))
+      .sort((a, b) => (a.t || 0) - (b.t || 0) || (a.id < b.id ? -1 : 1));
+    $('msgs').innerHTML = msgs.length ? msgs.map(m => `<div class="bubble ${m.uid === uid ? 'mine' : ''}">
+        ${m.uid === uid ? '' : `<div class="who">${esc(m.name)}${m.uid === meta.organizer ? ' · organizer' : ''}</div>`}${esc(m.text)}
+        <button class="more" data-m="${esc(m.id)}" aria-label="More">⋯</button></div>`).join('')
+      : '<div class="empty">No messages yet. Say hi, or note times that work.</div>';
+    $('msgs').querySelectorAll('.more').forEach(b => b.onclick = () => messageActions(b.dataset.m));
+    if (msgs.length !== lastMsgCount) { lastMsgCount = msgs.length; window.scrollTo(0, document.body.scrollHeight); }
+  }
+
+  // ------------------------------------------------------------ start
+  firebase.auth().onAuthStateChanged(u => {
+    if (!u) return firebase.auth().signInAnonymously().catch(() => { $('status').textContent = 'Could not connect. Reload to try again.'; });
+    const first = uid == null;
+    uid = u.uid;
+    if (!first) return;
+    if (code) watchPlan(); else setupCreate();
+  });
+</script>
+</body>
+</html>
